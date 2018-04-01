@@ -45,9 +45,9 @@ public:
 private:
   static unsigned int const kThreadsGroupWidth;
 
-  static unsigned int const kMaxParticleCount = (1u << 15u);
+  static unsigned int const kMaxParticleCount = (1u << 17u);
 
-  static unsigned int const kBatchEmitCount = (1u << 10u);//256; //(kMaxParticleCount >> 5u);
+  static unsigned int const kBatchEmitCount = (1u << 12u);
   static float constexpr kDefaultSimulationBoxSize = 256.0f;
 
   static

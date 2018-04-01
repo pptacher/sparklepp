@@ -75,8 +75,8 @@ void GPUParticle::init() {
   randbuffer_.generate_values();
 
   //vector field generator.
-  if (enable_vectorfield_) {
-    vectorfield_.initialize(128u, 128u, 64u);
+  if (1) {
+    vectorfield_.initialize(256u, 256u,256u);
     vectorfield_.generate_values("velocities.dat");
   }
 
@@ -220,9 +220,10 @@ void GPUParticle::update(const float dt, mat4x4 const &view) {
   //number of particles to be emitted.
   unsigned int const emit_count = std::min(kBatchEmitCount, num_dead_particles);
 
-  //update random buffer with new values.
+
+  //update random buffer with new values.too heavy.
   //randbuffer_.generate_values();
-std::cout << "num alive" << num_alive_particles_ << '\n';
+
   //emission stage: write in buffer A.
   _emission(emit_count);
 
@@ -231,7 +232,7 @@ std::cout << "num alive" << num_alive_particles_ << '\n';
 //std::cout << "simulated:" << enable_sorting_ << '\n';
   //sort particles for alpha-blending.
   if (1 and simulated_) {
-    _sorting(view);
+    //_sorting(view);
   }
   //post process stage.
   _postprocess();
@@ -284,13 +285,11 @@ void GPUParticle::render(mat4x4 const &view, mat4x4 const &viewProj) {
       glUnmapBuffer(GL_ARRAY_BUFFER);*/
 
     glBindVertexArray(vao_[0]);
-      glDrawElements(GL_POINTS, num_alive_particles_, GL_UNSIGNED_SHORT, 0);
-      //glDrawArrays(GL_POINTS, 0, num_alive_particles_);
+      //glDrawElements(GL_POINTS, num_alive_particles_, GL_UNSIGNED_SHORT, 0);
+      glDrawArrays(GL_POINTS, 0, num_alive_particles_);
     glBindVertexArray(0u);
   }
   glUseProgram(0u);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   CHECKGLERROR();
 }
@@ -348,7 +347,7 @@ void GPUParticle::_setup_simulation() {
   }*/
   //randbuffer_.unbind();
   glBindVertexArray(0u);
- 
+
   CHECKGLERROR();
 }
 
@@ -356,7 +355,7 @@ void GPUParticle::_setup_render() {
 
   glGenBuffers(1u, &sorted_indices_);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sorted_indices_);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, FloorParticleCount(kMaxParticleCount) * sizeof(GLushort), nullptr, GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, FloorParticleCount(kMaxParticleCount) * sizeof(GLushort), nullptr, GL_DYNAMIC_DRAW);
 
   glGenVertexArrays(2u, vao_);
 
@@ -530,7 +529,8 @@ void GPUParticle::_simulation(float const dt) {
     glUniform1f(ulocation_.simulation.deltaT, dt);
     glUniform1i(ulocation_.simulation.vectorFieldSampler, 0);
     glUniform1f(ulocation_.simulation.bboxSize, simulation_box_size_);
-
+    glActiveTexture( GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, vectorfield_.texture_id());
     glGenQueries(1, &particles_query);
     glBeginQuery(GL_PRIMITIVES_GENERATED, particles_query);
 
@@ -548,9 +548,7 @@ void GPUParticle::_simulation(float const dt) {
   glBindVertexArray(0);
 
   glBindTexture(GL_TEXTURE_3D, 0u);
-  //std::cout << "particles passed simulation: " << num_alive_particles_ << '\n';
   num_alive_particles_ = particles_passed;
-
   /*glBindBuffer(GL_ARRAY_BUFFER, pbuffer_->second_array_buffer_id());
   GLfloat *data5 = (GLfloat*)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
   std::cout <<'\n' << "vboB after simulating: " << '\n';
@@ -595,7 +593,7 @@ void GPUParticle::_sorting(mat4x4 const &view) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
+glViewport(0,0,texture_width_, texture_height_);
   //write to texture.
   glActiveTexture( GL_TEXTURE0 + 1);
   glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[1]);
@@ -644,7 +642,6 @@ void GPUParticle::_sorting(mat4x4 const &view) {
     glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
 
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
-    glViewport(0, 0, texture_width_, texture_height_);
 
     glDrawArrays(GL_TRIANGLE_FAN,0, 4);
 
@@ -734,7 +731,7 @@ CHECKGLERROR();
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glBindVertexArray(vao);
-glViewport(0,0,texture_width_, texture_height_);
+
   unsigned int binding = 0u;
   for (size_t step = 0; step < nsteps; step++) {
     for (size_t stage = 0; stage < step + 1u; stage++) {

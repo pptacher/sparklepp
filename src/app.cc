@@ -48,7 +48,7 @@ bool App::init(char const* title) {
     InitGL();
 
     //camera setup.
-    camera_.dolly(195.0f);
+    camera_.dolly(095.0f);
 
     //setup the projection matrix.
     float const aspectRatio = w / static_cast<float>(h);
@@ -59,6 +59,7 @@ bool App::init(char const* title) {
 
     //start the demo.
     time_ = std::chrono::steady_clock::now();
+    start_time_ = std::chrono::steady_clock::now();
 
     return true;
 }
@@ -108,6 +109,7 @@ void App::_frame() {
 }
 
 
+
 void App::_update_camera() {
   TEventData const event = GetEventData();
 
@@ -133,7 +135,7 @@ void App::_update_camera() {
 }
 void App::_update_time() {
   std::chrono::steady_clock::time_point tick = std::chrono::steady_clock::now();
-
+std::cout << "fps:"  << (++num_frames_) / (float) std::chrono::duration_cast<std::chrono::duration<double>>(tick-start_time_).count() << '\n';
   std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(tick - time_);
   time_ = tick;
 

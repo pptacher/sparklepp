@@ -16,6 +16,11 @@ public:
   //generate vector datas.
   //load them from filename if it exists, otherwise compute them and save on disk.
   void generate_values(char const *filename);
+  glm::vec3 compute_curl(glm::vec3);
+  glm::vec3 compute_gradient(glm::vec3);
+  glm::vec3 get_curl_noise(glm::vec3);
+  float sample_distance(glm::vec3);
+  glm::vec3 sample_potential(glm::vec3);
 
   inline const glm::uvec3& dimensions() const {
     return dimensions_;
@@ -30,7 +35,6 @@ public:
   }
 
 private:
-  glm::vec3 _generate_vector(glm::vec3 const& p) const;
 
   glm::uvec3 dimensions_;
   glm::vec3 position_;

@@ -2,7 +2,7 @@
 
 uniform mat4 uMVP;
 uniform mat4 uView;
-uniform float uSpriteSizeRatio = 35.0f;
+uniform float uSpriteSizeRatio = 0.35f;
 
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
@@ -28,7 +28,7 @@ void main() {
   vec3 u = view * IN[0].velocity;
 
   //stretched billboard dimensions.
-  float w =0.35f;
+  float w =0.15f;
 
   float speed = smoothstep(0.0f, 500.0f, dot(u, u));
   float h = w * mix(1.0f, uSpriteSizeRatio, speed);

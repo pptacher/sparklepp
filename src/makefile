@@ -85,6 +85,9 @@ random_buffer.o : ./api/random_buffer.cc
 vector_field.o : ./api/vector_field.cc
 			$(COMPILO) $(CXX_DEFINES) -c -std=c++14 $(CXXFLAGS_COOK) ./api/vector_field.cc
 
+noise.o : ./api/noise.cc
+			$(COMPILO) $(CXX_DEFINES) -c -std=c++14 $(CXXFLAGS_COOK) ./api/noise.cc
+
 # Fabrication des .o (hors lib)
 
 main.o : main.cc
@@ -92,8 +95,8 @@ main.o : main.cc
 
 # Fabrication de la lib
 
-libsparkle.so : app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o
-	$(COMPILO) -o libsparkle.so -shared -lglfw3  -lGlew -framework Cocoa -framework OpenGL -framework Glut -framework IOKit -framework CoreVideo  app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o
+libsparkle.so : app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o noise.o
+	$(COMPILO) -o libsparkle.so -shared -lglfw3  -lGlew -framework Cocoa -framework OpenGL -framework Glut -framework IOKit -framework CoreVideo  app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o noise.o
 
 # Fabrication de l'ex�cutable
 

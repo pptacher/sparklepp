@@ -10,7 +10,7 @@ struct GLFWwindow;
 
 class App {
   public :
-  App() : window_(nullptr), deltatime_(0.0f) {}
+  App() : window_(nullptr), deltatime_(0.0f), num_frames_(0){}
 
   bool init(char const* title);
   void deinit();
@@ -23,6 +23,7 @@ class App {
     void _update_time();
 
     std::chrono::steady_clock::time_point time_;
+    std::chrono::steady_clock::time_point start_time_;
     GLFWwindow *window_;
 
     ArcBallCamera camera_;
@@ -36,6 +37,7 @@ class App {
     Scene scene_;
 
     float deltatime_;
+    float num_frames_;
 };
 
 #endif

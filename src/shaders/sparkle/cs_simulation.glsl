@@ -121,12 +121,12 @@ vec3 ApplyTargetMesh(in TParticle p) {
 vec3 ApplyVectorField(in TParticle p) {
   vec3 vfield = vec3(0.0f);
 
-#if ENABLE_VECTORFIELD
-  const vec3 pt = p.position.xyz;
+#if 1 //ENABLE_VECTORFIELD
+  vec3 pt = p.position.xyz;
 
-  const ivec3 texsize = textureSize(uVectorFieldSampler, 0).xyz;
-  const vec3 extent = 0.5f * vec3(texsize.x, texsize.y, texsize.z);
-  const vec3 texcoord = (pt + extent) / (2.0f * extent);
+  ivec3 texsize = textureSize(uVectorFieldSampler, 0).xyz;
+  vec3 extent = 0.5f * vec3(texsize.x, texsize.y, texsize.z);
+  vec3 texcoord = (pt + extent) / (2.0f * extent);
 
   vfield = texture(uVectorFieldSampler, texcoord).xyz;
 
@@ -240,7 +240,7 @@ void main() {
     vec3 vel = fma(force, dt, p.velocity.xyz);
 
     //get curling noise.
-    vec3 noise_vel = GetCurlNoise(p);
+    vec3 noise_vel =  ApplyVectorField(p);
 
     vel += noise_vel;
     noise_vel *= 0.0f;
