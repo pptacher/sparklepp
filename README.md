@@ -12,3 +12,5 @@ Compute shader functionality, atomic counter & shader storage extensions not sup
 - *Spärkle*, Thibault Coppex, [A modern particle engine running on GPU, using c++11 and OpenGL 4.x.](https://github.com/tcoppex/sparkle)
 
 - *GPU Gems*, Ian Buck Tim Purcell, [A Toolkit for Computation on GPUs.](http://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch37.html)
+
+- *Noise-based particles*, Philip Rideout, [Noise-Based Particles, Part II](http://prideout.net/blog/?p=67)
