@@ -1,7 +1,7 @@
 # sparklepp
 particule simulation with OpenGL
 
-![alt text](https://github.com/pptacher/sparklepp/blob/master/screenshot.png)
+![alt text](https://github.com/pptacher/sparklepp/blob/master/screenshot.jpg)
 
 I have reengineered the particle engine from tcoppex/sparkle, to make it compatible with OpenGL 4.1 only hardware (Mac).
 
