@@ -1,6 +1,9 @@
 #ifndef DEMO_SCENE_H_
 #define DEMO_SCENE_H_
 
+#include <map>
+#include <string>
+
 #include "opengl.h"
 #include "linmath.h"
 
@@ -71,6 +74,8 @@ private:
   GLuint gl_sprite_tex_;
 
   GPUParticle *gpu_particle_;
+
+
 };
 
 

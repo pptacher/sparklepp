@@ -2,11 +2,27 @@
 #define DEMO_APP_H_
 
 #include <chrono>
+#include <sstream>
 #include "linmath.h"
 #include "arcball_camera.h"
 #include "scene.h"
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "opengl.h"
+
 struct GLFWwindow;
+
+struct Character {
+  GLuint textureID;
+  glm::ivec2 size;
+  glm::ivec2 bearing;
+  GLuint advance;
+};
 
 class App {
   public :
@@ -21,6 +37,10 @@ class App {
     void _frame();
     void _update_camera();
     void _update_time();
+    void setup_text();
+    void setup_shaders();
+    void render_text(std::string, float, float, float, glm::vec3);
+
 
     std::chrono::steady_clock::time_point time_;
     std::chrono::steady_clock::time_point start_time_;
@@ -34,10 +54,27 @@ class App {
       mat4x4 viewProj;
     } matrix_;
 
+    struct {
+      GLuint text;
+    } pgm_;
+
+    struct {
+      struct {
+        GLint projection;
+        GLint color;
+      } text;
+    } ulocation_;
+
     Scene scene_;
+
+    std::map<GLchar, Character> characters;
 
     float deltatime_;
     float num_frames_;
+    float fps_;
+
+    GLuint vao_;                    //vao for rendering text.
+    GLuint vbo_;
 };
 
 #endif

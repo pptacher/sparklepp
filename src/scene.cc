@@ -52,7 +52,7 @@ void Scene::render(mat4x4 const &view, mat4x4 const &viewProj) {
   //grid.
   glEnable(GL_DEPTH_TEST);
   glDisable(GL_BLEND);
-  draw_grid(viewProj);
+  //draw_grid(viewProj);
 
   //particle simulation.
   glDisable(GL_DEPTH_TEST);
@@ -72,13 +72,13 @@ void Scene::render(mat4x4 const &view, mat4x4 const &viewProj) {
   //simulation bounding box.
   mat4x4_scale_iso(mvp, viewProj, gpu_particle_->simulation_box_size());
   vec4_set(color, 0.5f, 0.4f, 0.5f, 0.5f);
-  draw_wirecube(mvp, color);
+  //draw_wirecube(mvp, color);
 
   //vector field bounding box.
   glm::vec3 const& dim = gpu_particle_->vectorfield_dimensions();
   mat4x4_scale_aniso(mvp, viewProj, dim.x, dim.y, dim.z);
   vec4_set(color, 0.5f, 0.5f, 0.1f, 0.3f);
-  draw_wirecube(mvp, color);
+  //draw_wirecube(mvp, color);
 
 
   // Sphere

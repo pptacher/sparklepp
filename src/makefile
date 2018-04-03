@@ -20,7 +20,7 @@ ARCHIVE_NAME     = $(ARCHIVE_DIR_NAME).tar.gz
 
 FILES_TO_BE_ARCHIVED = *.hpp *.cpp Makefile
 
-INCLUDE_PATH = -I. -I../thirdparty/ -I./tools/
+INCLUDE_PATH = -I. -I../thirdparty/ -I./tools/ -I/usr/local/include/freetype2
 
 #doesn't support -std=c++14 when using "g++"
 COMPILO     =  ~/gcc-5.4.0/bin/g++
@@ -96,7 +96,7 @@ main.o : main.cc
 # Fabrication de la lib
 
 libsparkle.so : app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o noise.o
-	$(COMPILO) -o libsparkle.so -shared -lglfw3  -lGlew -framework Cocoa -framework OpenGL -framework Glut -framework IOKit -framework CoreVideo  app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o noise.o
+	$(COMPILO) -o libsparkle.so -shared -lglfw3  -lFreetype -lGlew -framework Cocoa -framework OpenGL -framework Glut -framework IOKit -framework CoreVideo  app.o events.o opengl.o scene.o append_consume_buffer.o gpu_particle.o random_buffer.o vector_field.o noise.o
 
 # Fabrication de l'ex�cutable
 
