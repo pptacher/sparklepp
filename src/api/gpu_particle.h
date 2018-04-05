@@ -8,6 +8,7 @@
 #include "api/vector_field.h"
 #include <iostream>
 #include <utility>
+
 class AppendConsumeBuffer;
 
 class GPUParticle {
@@ -45,9 +46,8 @@ public:
 private:
   static unsigned int const kThreadsGroupWidth;
 
-  static unsigned int const kMaxParticleCount = (1u << 17u);
-
-  static unsigned int const kBatchEmitCount = (1u << 12u);
+  static unsigned int const kMaxParticleCount = (1u << 16u);
+  static unsigned int const kBatchEmitCount = (1u << 11u);
   static float constexpr kDefaultSimulationBoxSize = 256.0f;
 
   static
@@ -113,6 +113,8 @@ private:
       GLint maxBlockWidth;
       GLint width;
       GLint height;
+      GLint texWidth;
+      GLint texHeight;
     } sort_step;
     struct {
       GLint mvp;
@@ -153,8 +155,8 @@ private:
   GLuint dp_texture_id_;                          //< DotProduct float texture.
   GLuint indices_texture_ids_[2];                     //< indices unsigned int texture (for sorting).
 
-  GLuint texture_width_;
-  GLuint texture_height_;
+  GLuint texture_width_1;
+  GLuint texture_height_1;
   GLuint framebuffer_;
 
   GLuint sorted_indices_;                             //sorted indices buffer.

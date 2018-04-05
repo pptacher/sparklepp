@@ -6,6 +6,9 @@ uniform uint uMaxBlockWidth;
 uniform uint uBlockWidth;
 uniform uint width;
 uniform uint height;
+uniform uint texWidth;
+uniform uint texHeight;
+
 uniform sampler2D dp;
 uniform usampler2D indices;
 
@@ -20,7 +23,7 @@ void main(void) {
   uint pair_distance = block_width / 2u;
 
   // get self
-  uvec4 val0 =  texture(indices, ownPosition);
+  uvec4 val0 =  texture(indices, vec2(ownPosition.x * float(width) / texWidth, ownPosition.y * float(height) / texHeight));
   uint i = uint(floor(ownPosition.x * width) + floor(ownPosition.y * height) * width);
 
   int direction =  ((i % uBlockWidth) < pair_distance) ? 1: -1; // which half in the block ?
@@ -28,12 +31,13 @@ void main(void) {
 
   uint j = i + direction * pair_distance;
 
-  uvec4 val1 = texture(indices, vec2( float((j % width)) / float(width), float(j) / (float(width * height )) ));
+  uvec4 val1 = texture(indices, vec2( float((j % width)) / float(width) * float(width) / texWidth,
+                                      float(j) / (float(width * height )) * float(height) / texHeight ));
 
   int order = direction * orientation;
 
-  float dp0 = (texture(dp, vec2(float((val0.x % width)) / float(width), float(val0.x) / (float(width * height ))) ) ).x;
-  float dp1 = (texture(dp, vec2(float((val1.x % width)) / float(width), float(val1.x) / (float(width * height ))) ) ).x;
+  float dp0 = (texture(dp, vec2(float((val0.x % width)) / float(width) * float(width) / texWidth, float(val0.x) / (float(width * height ))* float(height) / texHeight) ) ).x;
+  float dp1 = (texture(dp, vec2(float((val1.x % width)) / float(width)* float(width) / texWidth, float(val1.x) / (float(width * height ))* float(height) / texHeight) ) ).x;
   color = ( order*dp0 > order*dp1 ) ? val0.x : val1.x ;
 
 }

@@ -144,7 +144,7 @@ vec3 GetCurlNoise(in TParticle p) {
 
 #if ENABLE_CURLNOISE
   const float effect = 2.0f;
-  const float scale = 1.0f / 1.0f;
+  const float scale = 1.0f / 256.0f;
   curl  = effect * compute_curl(p.position.xyz * scale);
 #endif
 

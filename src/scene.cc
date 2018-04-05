@@ -19,7 +19,7 @@ void Scene::init() {
   setup_sphere_geometry();
   setup_texture();
   //set OpenGL rendering parameters.
-  glClearColor(0.155f, 0.15f, 0.13f, 1.0f);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glEnable(GL_PROGRAM_POINT_SIZE);
 
   glBlendEquation(GL_FUNC_ADD);
@@ -57,8 +57,8 @@ void Scene::render(mat4x4 const &view, mat4x4 const &viewProj) {
   //particle simulation.
   glDisable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-  //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   //gpu_particle_->enable_sorting(true);//sorting phase occur during update.so before here.
   gpu_particle_->render(view, viewProj);
 
