@@ -10,6 +10,12 @@ Compute shader functionality, atomic counter & shader storage extensions are not
 Instead of shader storage, textures are used to share indices of particules to be sorted for alpha blending  between fragment shaders instanciations.
 I use queries instead of atomic counter to get the number of alive particules.
 
+## dependencies
+
+- [GLFW 3.x](https://github.com/glfw/glfw/tree/3.0),
+- [GLM 9.8](https://github.com/g-truc/glm/releases/tag/0.9.8.0).
+- [FreeType](https://www.freetype.org/download.html)
+
 
 ## references
 
