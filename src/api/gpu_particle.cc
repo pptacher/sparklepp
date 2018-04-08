@@ -60,6 +60,7 @@ namespace {
 } //namespace
 
 void GPUParticle::init() {
+
   //assert that the number of particles will be a factor of threadGroupWidth.
   unsigned int const num_particles = FloorParticleCount(kMaxParticleCount);
   fprintf(stderr, "[ %u particles, %u per batch ]\n", num_particles, kBatchEmitCount);
@@ -178,19 +179,46 @@ void GPUParticle::init() {
 
   glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, texture_width_1, texture_height_1, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[1]);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, texture_width_1, texture_height_1, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
   //framebuffer.
   glGenFramebuffers(1, &framebuffer_);
+  glGenFramebuffers(2u, framebuf);
+  glGenFramebuffers(1, &framebuffer1_);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   //dot products float texture.
   glGenTextures(1, &dp_texture_id_);
+  glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, texture_width_1, texture_height_1, 0, GL_RED, GL_FLOAT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  glGenBuffers(1, &vbo_);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * kMaxParticleCount, nullptr, GL_DYNAMIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   //set up VAOs.
   _setup_emission();
   _setup_simulation();
   _setup_render();
+  _setup_fill_indices();
+  _setup_calculate_dp();
 
   //query used for the benchmarking.
   glGenQueries(1, &query_time_);
@@ -209,19 +237,37 @@ void GPUParticle::deinit() {
     vectorfield_.deinitialize();
   }
 
+  glUseProgram(0);
   glDeleteProgram(pgm_.emission);
   glDeleteProgram(pgm_.update_args);
   glDeleteProgram(pgm_.simulation);
   glDeleteProgram(pgm_.fill_indices);
   glDeleteProgram(pgm_.calculate_dp);
   glDeleteProgram(pgm_.sort_step);
-  glDeleteProgram(pgm_.sort_final);
-  glDeleteProgram(pgm_.render_point_sprite);
+  //glDeleteProgram(pgm_.sort_final);
+  //glDeleteProgram(pgm_.render_point_sprite);
+  glDeleteProgram(pgm_.render_stretched_sprite);
 
   glDeleteVertexArrays(1u, vao_e_);
   glDeleteVertexArrays(2u, vao_s_);
   glDeleteVertexArrays(2u, vao_);
+  glDeleteVertexArrays(1u, &vao_f_);
+  glDeleteVertexArrays(2u, vao_c_);
   glDeleteQueries(1u,&query_time_);
+
+  glDeleteTextures(1, &dp_texture_id_);
+  glDeleteTextures(2, indices_texture_ids_);
+
+  glDeleteFramebuffers(1, &framebuffer_);
+  glDeleteFramebuffers(2, framebuf);
+  glDeleteFramebuffers(1, &framebuffer1_);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  glDeleteBuffers(1, &vbo_);
+  glDeleteBuffers(1, &sorted_indices_);
+
+  CHECKGLERROR();
 }
 
 void GPUParticle::update(const float dt, mat4x4 const &view) {
@@ -243,7 +289,7 @@ void GPUParticle::update(const float dt, mat4x4 const &view) {
   if (1 and simulated_) {
     _sorting(view);
   }
-  //post process stage.
+
   _postprocess();
 
   CHECKGLERROR();
@@ -300,7 +346,6 @@ void GPUParticle::render(mat4x4 const &view, mat4x4 const &viewProj) {
   }
   glUseProgram(0u);
 
-
   CHECKGLERROR();
 }
 
@@ -316,6 +361,67 @@ randbuffer_.unbind();
   glBindVertexArray(0);
 
   CHECKGLERROR();
+}
+
+void GPUParticle::_setup_calculate_dp() {
+
+  glUseProgram(pgm_.calculate_dp);
+  {
+
+    glGenVertexArrays(2, vao_c_);
+    glBindVertexArray(vao_c_[0]);
+
+    GLuint vboB = pbuffer_->second_array_buffer_id();
+
+    glBindBuffer(GL_ARRAY_BUFFER, vboB); {
+      glVertexAttribPointer(alocation_.calculate_dp.position, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), nullptr);
+      glEnableVertexAttribArray(alocation_.calculate_dp.position);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0u);
+
+    glBindVertexArray(vao_c_[1]);
+    vboB = pbuffer_->first_array_buffer_id();
+
+    glBindBuffer(GL_ARRAY_BUFFER, vboB); {
+      glVertexAttribPointer(alocation_.calculate_dp.position, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), nullptr);
+      glEnableVertexAttribArray(alocation_.calculate_dp.position);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0u);
+  }
+  glUseProgram(0u);
+  glBindVertexArray(0);
+
+  CHECKGLERROR();
+}
+
+void GPUParticle::_setup_fill_indices() {
+  glGenVertexArrays(1u, &vao_f_);
+  glBindVertexArray(vao_f_);
+
+    GLfloat vertices[] = {
+        -1.0f, -1.0f, 0.0f, 0.0f,
+         1.0f, -1.0f, 1.0f  , 0.0f,
+         1.0f, 1.0f, 1.0f, 1.0f,
+         -1.0f, 1.0f, 0.0f, 1.0f
+    };
+
+    ;
+    glGenBuffers(1, &vbo_f_);
+    glUseProgram(pgm_.fill_indices);
+    {
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_f_);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+      GLint posAttrib = glGetAttribLocation(pgm_.fill_indices, "position");
+      glEnableVertexAttribArray(posAttrib);
+      glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+      GLint texAttrib = glGetAttribLocation(pgm_.fill_indices, "texcoord");
+      glEnableVertexAttribArray(texAttrib);
+      glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
+
+  CHECKGLERROR();
+    }
+    glUseProgram(0u);
+    glBindVertexArray(0u);
 }
 
 void GPUParticle::_setup_simulation() {
@@ -596,27 +702,14 @@ void GPUParticle::_sorting(mat4x4 const &view) {
   GLuint texture_width_ = 1 << (GLuint) (ln_size);
   GLuint texture_height_ = 1 << (GLuint)(std::log2(max_elem_count) - ln_size);
 
-  glActiveTexture( GL_TEXTURE0 );
-  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-
-  //write to texture.
-  glActiveTexture( GL_TEXTURE0 + 1);
-  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[1]);
-
   //framebuffer.
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
   glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, indices_texture_ids_[0], 0);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   GLuint clear_value1[] = {0, 0, 0, 0};
   glClearBufferuiv(GL_COLOR, 0, clear_value1);
   glViewport(0,0,texture_width_, texture_height_);
-/*glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
+/*
+glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
   GLushort *data1 = (GLushort*)malloc(kMaxParticleCount * sizeof(GL_UNSIGNED_SHORT));
   glReadPixels(0.0f, 0.0f, texture_width_1, texture_height_1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, data1);
   std::cout <<'\n' << "filled indices: " << '\n';
@@ -628,51 +721,6 @@ void GPUParticle::_sorting(mat4x4 const &view) {
   std::cout <<  std::endl;
   free(data1);*/
 
-  glActiveTexture( GL_TEXTURE0 + 2);
-  glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, texture_width_1, texture_height_1, 0, GL_RED, GL_FLOAT, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glBindTexture(GL_TEXTURE_2D, 0);
-
-  GLfloat vertices[] = {
-      -1.0f, -1.0f, 0.0f, 0.0f,
-       1.0f, -1.0f, 1.0f  , 0.0f,
-       1.0f, 1.0f, 1.0f, 1.0f,
-       -1.0f, 1.0f, 0.0f, 1.0f
-  };
-
-  GLuint vao;
-  glGenVertexArrays(1, &vao);
-  glBindVertexArray(vao);
-  GLuint vbo;
-  glGenBuffers(1, &vbo);
-  /* 1) Intialize indices and dotproducts buffers. */
-  // Fill first part of the indices buffer with continuous indices.
-  glUseProgram(pgm_.fill_indices);
-  {
-    glUniform1ui(ulocation_.fill_indices.width, texture_width_);
-    glUniform1ui(ulocation_.fill_indices.height, texture_height_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    GLint posAttrib = glGetAttribLocation(pgm_.fill_indices, "position");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
-    GLint texAttrib = glGetAttribLocation(pgm_.fill_indices, "texcoord");
-    glEnableVertexAttribArray(texAttrib);
-    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
-
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
-
-    glDrawArrays(GL_TRIANGLE_FAN,0, 4);
-
-CHECKGLERROR();
-  }
-  glUseProgram(0u);
-  glBindVertexArray(0u);
-//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 /*
 glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
 GLushort *data = (GLushort*)malloc(kMaxParticleCount * sizeof(GL_UNSIGNED_SHORT));
@@ -686,11 +734,25 @@ for (size_t i = 0; i < kMaxParticleCount; i += 1) {
 std::cout <<  std::endl;
 free(data);*/
 
+/* 1) Intialize indices and dotproducts buffers. */
+// Fill first part of the indices buffer with continuous indices.
+  glBindVertexArray(vao_f_);
+  glUseProgram(pgm_.fill_indices);
+  {
+    glUniform1ui(ulocation_.fill_indices.width, texture_width_);
+    glUniform1ui(ulocation_.fill_indices.height, texture_height_);
+
+    glDrawArrays(GL_TRIANGLE_FAN,0, 4);
+
+  }
+  glUseProgram(0);
+  glBindVertexArray(0);
+
+  CHECKGLERROR();
+
   //clear the dot product buffer.
   GLfloat const clear_value[] = {-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX} ;
 
-  GLuint framebuffer1_;
-  glGenFramebuffers(1, &framebuffer1_);
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer1_);
   glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dp_texture_id_, 0);
   glClearBufferfv(GL_COLOR, 0, clear_value);
@@ -698,34 +760,23 @@ free(data);*/
   //compute dot products of particles toward the camera.
   glUseProgram(pgm_.calculate_dp);
   {
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * max_elem_count, nullptr, GL_STATIC_DRAW);
 
-    GLuint vboB = pbuffer_->second_array_buffer_id();
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
 
-    glBindBuffer(GL_ARRAY_BUFFER, vboB); {
+    /// @note No kernel boundaries check performed.
+    glUniformMatrix4fv(ulocation_.calculate_dp.view, 1, GL_FALSE, (GLfloat *const)view);
+    glEnable(GL_RASTERIZER_DISCARD);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vbo_);
+    glBindVertexArray(vao_c_[0]);
+    glBeginTransformFeedback(GL_POINTS);
+      glDrawArrays(GL_POINTS, 0, max_elem_count);
+    glEndTransformFeedback();
+    glDisable(GL_RASTERIZER_DISCARD);
 
-      glVertexAttribPointer(alocation_.calculate_dp.position, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), nullptr);
-      glEnableVertexAttribArray(alocation_.calculate_dp.position);
-
-      /// @note No kernel boundaries check performed.
-      glUniformMatrix4fv(ulocation_.calculate_dp.view, 1, GL_FALSE, (GLfloat *const)view);
-      glEnable(GL_RASTERIZER_DISCARD);
-      glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vbo);
-      glBeginTransformFeedback(GL_POINTS);
-        glDrawArrays(GL_POINTS, 0, max_elem_count);
-      glEndTransformFeedback();
-      glDisable(GL_RASTERIZER_DISCARD);
-
-      glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
-      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, vbo);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture_width_, texture_height_, GL_RED, GL_FLOAT, 0);
-      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, vbo_);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture_width_, texture_height_, GL_RED, GL_FLOAT, 0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 /*
       glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
 
@@ -740,52 +791,34 @@ free(data);*/
       std::cout <<  std::endl;
       free(data2);*/
 
-      glBindFramebuffer(GL_FRAMEBUFFER, 0u);
-    }
-    glBindBuffer(GL_ARRAY_BUFFER, 0u);
   }
   glUseProgram(0u);
+  glBindVertexArray(0);
+  CHECKGLERROR();
 
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuf[0]);
+  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[1]);
+  glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, indices_texture_ids_[1], 0);
+  glClearBufferuiv(GL_COLOR, 0, clear_value1);
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuf[1]);
+  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
+  glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, indices_texture_ids_[0], 0);
 
-
-CHECKGLERROR();
+  glActiveTexture( GL_TEXTURE0 );
+  glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
 
   unsigned int const nsteps = GetNumTrailingBits(max_elem_count);
   uint dp_texture_location = glGetUniformLocation(pgm_.sort_step, "dp");
   uint indices_texture_location = glGetUniformLocation(pgm_.sort_step, "indices");
-
   glUseProgram(pgm_.sort_step);
   glUniform1i(dp_texture_location, 0);
   glUniform1i(indices_texture_location, 1);
   glUniform1ui(ulocation_.sort_step.width, texture_width_);
   glUniform1ui(ulocation_.sort_step.height, texture_height_);
-
-  GLuint framebuf[2];
-  glGenFramebuffers(2u, framebuf);
-  glBindFramebuffer(GL_FRAMEBUFFER, framebuf[0]);
-  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[1]);
-  glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, indices_texture_ids_[1], 0);
-  glClearBufferuiv(GL_COLOR, 0, clear_value1);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glBindFramebuffer(GL_FRAMEBUFFER, framebuf[1]);
-  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
-  glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, indices_texture_ids_[0], 0);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glBindFramebuffer(GL_FRAMEBUFFER, framebuf[0]);
-
-  glActiveTexture( GL_TEXTURE0 );
-  glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
-  glActiveTexture( GL_TEXTURE0 + 1);
-  glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[0]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glBindVertexArray(vao);
-
   glUniform1ui(ulocation_.sort_step.texWidth, texture_width_1);
   glUniform1ui(ulocation_.sort_step.texHeight, texture_height_1);
 
+  glBindVertexArray(vao_f_);
   unsigned int binding = 0u;
   for (size_t step = 0; step < nsteps; step++) {
     for (size_t stage = 0; stage < step + 1u; stage++) {
@@ -797,17 +830,12 @@ CHECKGLERROR();
       glUniform1ui(ulocation_.sort_step.maxBlockWidth, max_block_width);
 
       glBindFramebuffer(GL_FRAMEBUFFER, framebuf[binding]);
-      glActiveTexture( GL_TEXTURE0  );
-      glBindTexture(GL_TEXTURE_2D, dp_texture_id_);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glActiveTexture( GL_TEXTURE0 + 1u );
       glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[binding]);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       binding ^= 1u;
 
       glDrawArrays(GL_TRIANGLE_FAN,0, 4);
+
 /*
       glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[binding]);
       GLushort *data5 = (GLushort*)malloc(kMaxParticleCount * sizeof(GL_UNSIGNED_SHORT));
@@ -819,8 +847,8 @@ CHECKGLERROR();
         std::cout << data5[i] << " ";
       }
       std::cout <<  std::endl;
-      free(data5);*/
-
+      free(data5);
+*/
 CHECKGLERROR();
     }
   }
@@ -828,7 +856,6 @@ CHECKGLERROR();
   glBindVertexArray(0u);
 
   glBindTexture(GL_TEXTURE_2D, indices_texture_ids_[binding]);
-
   glBindBuffer(GL_PIXEL_PACK_BUFFER, sorted_indices_);
     glReadPixels(0, 0, texture_width_, texture_height_, GL_RED_INTEGER, GL_UNSIGNED_SHORT, 0);
   glBindBuffer(GL_PIXEL_PACK_BUFFER, 0u);
@@ -844,11 +871,10 @@ CHECKGLERROR();
   std::cout <<  std::endl;
   glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);*/
 
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
   glBindTexture(GL_TEXTURE_2D, 0);
   CHECKGLERROR();
-
 }
 
 void GPUParticle::_postprocess() {
@@ -859,13 +885,9 @@ void GPUParticle::_postprocess() {
       pbuffer_->swap_storage();
       std::swap(vao_s_[0], vao_s_[1]);
       std::swap(vao_[0], vao_[1]);
+      std::swap(vao_c_[0], vao_c_[1]);
     }
   }
-
-  /* Copy the number of alive particles to the indirect buffer for drawing. */
-  /// @note We use the update_args kernel instead, loosing 1 frame of accuracy.
-  //glCopyNamedBufferSubData(
-    //pbuffer_->first_atomic_buffer_id(), gl_indirect_buffer_id_, 0u, offsetof(TIndirectValues, draw_count), sizeof(GLuint));
 
     CHECKGLERROR();
 }

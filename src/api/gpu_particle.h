@@ -63,6 +63,8 @@ private:
   void _setup_render();
   void _setup_emission();
   void _setup_simulation();
+  void _setup_fill_indices();
+  void _setup_calculate_dp();
 
   void _emission(unsigned int const count);
   void _simulation(float const dt);
@@ -163,8 +165,16 @@ private:
 
   GLuint vao_e_[1];//VAO for emission
   GLuint vao_s_[2];//VAO for simulation
+  GLuint vao_c_[2];//VAO for calculating dp
   GLuint vao_[2];                                  //< VAOs rendering.
+  GLuint vao_f_;
   GLuint query_time_;                           //< QueryObject for benchmarking.
+
+  GLuint vbo_;
+  GLuint vbo_f_;
+
+  GLuint framebuf[2];
+  GLuint framebuffer1_;
 
   float simulation_box_size_;                   //< Boundary used by the simulation, if any.
 

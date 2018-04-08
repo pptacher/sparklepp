@@ -46,7 +46,7 @@ void Scene::update(mat4x4 const &view, float const dt) {
 }
 
 void Scene::render(mat4x4 const &view, mat4x4 const &viewProj) {
-
+//glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   //grid.

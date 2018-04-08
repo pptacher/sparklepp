@@ -49,7 +49,7 @@ bool App::init(char const* title) {
     InitGL();
 
     //camera setup.
-    camera_.dolly(125.0f);
+    camera_.dolly(155.0f);
 
     //setup the projection matrix.
     float const aspectRatio = w / static_cast<float>(h);
@@ -64,7 +64,6 @@ bool App::init(char const* title) {
     //start the demo.
     time_ = std::chrono::steady_clock::now();
     start_time_ = std::chrono::steady_clock::now();
-
 
     return true;
 }
@@ -129,7 +128,7 @@ void App::_update_camera() {
   //compute the view matrix.
   mat4x4_identity(matrix_.view);
 
-  vec3 eye    = {camera_.dolly(), 0.65f * camera_.dolly(), camera_.dolly()};
+  vec3 eye    = {camera_.dolly(), 0.65f * camera_.dolly(), 0.0f};
   vec3 center = {0.0f, 0.0f, 0.0f};
   vec3 up     = {0.0f, 1.0f, 0.0f};
   mat4x4_look_at(matrix_.view, eye, center, up);
